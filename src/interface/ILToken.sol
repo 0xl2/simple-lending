@@ -5,14 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface ILToken is IERC20 {
     /**
-     * @dev Emitted after the mint action
-     * @param from The address performing the mint
-     * @param value The amount being
-     * @param index The new liquidity index of the reserve
-     **/
-    event Mint(address indexed from, uint256 value, uint256 index);
-
-    /**
      * @dev Mints `amount` lTokens to `user`
      * @param user The address receiving the minted tokens
      * @param amount The amount of tokens getting minted
@@ -24,34 +16,6 @@ interface ILToken is IERC20 {
         uint256 amount,
         uint256 index
     ) external returns (bool);
-
-    /**
-     * @dev Emitted after lTokens are burned
-     * @param from The owner of the lTokens, getting them burned
-     * @param target The address that will receive the underlying
-     * @param value The amount being burned
-     * @param index The new liquidity index of the reserve
-     **/
-    event Burn(
-        address indexed from,
-        address indexed target,
-        uint256 value,
-        uint256 index
-    );
-
-    /**
-     * @dev Emitted during the transfer action
-     * @param from The user whose tokens are being transferred
-     * @param to The recipient
-     * @param value The amount being transferred
-     * @param index The new liquidity index of the reserve
-     **/
-    event BalanceTransfer(
-        address indexed from,
-        address indexed to,
-        uint256 value,
-        uint256 index
-    );
 
     /**
      * @dev Burns lTokens from `user` and sends the equivalent amount of underlying to `receiverOfUnderlying`
@@ -97,13 +61,6 @@ interface ILToken is IERC20 {
         address user,
         uint256 amount
     ) external returns (uint256);
-
-    /**
-     * @dev Invoked to execute actions on the lToken side after a repayment.
-     * @param user The user executing the repayment
-     * @param amount The amount getting repaid
-     **/
-    function handleRepayment(address user, uint256 amount) external;
 
     /**
      * @dev Returns the address of the underlying asset of this lToken (E.g. WETH for lWETH)

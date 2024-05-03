@@ -2,6 +2,25 @@
 pragma solidity ^0.8.0;
 
 interface ILendingPool {
+    struct ReserveData {
+        //the liquidity index. Expressed in ray
+        uint128 liquidityIndex;
+        //variable borrow index. Expressed in ray
+        uint128 variableBorrowIndex;
+        //the current supply rate. Expressed in ray
+        uint128 currentLiquidityRate;
+        //the current variable borrow rate. Expressed in ray
+        uint128 currentBorrowRate;
+        uint40 lastUpdateTimestamp;
+        //tokens addresses
+        address lTokenAddress;
+        address debtTokenAddress;
+        //address of the interest rate strategy
+        address interestRateStrategyAddress;
+        //the id of the reserve. Represents the position in the list of the active reserves
+        uint8 id;
+    }
+
     /**
      * @dev Emitted on deposit()
      * @param reserve The address of the underlying asset of the reserve
@@ -175,4 +194,8 @@ interface ILendingPool {
     ) external;
 
     function getReservesList() external view returns (address[] memory);
+
+    function getReserveNormalizedIncome(
+        address asset
+    ) external view returns (uint256);
 }

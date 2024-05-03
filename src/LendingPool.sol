@@ -6,36 +6,21 @@ import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeE
 
 import {ILToken} from "./interface/ILToken.sol";
 import {ILendingPool} from "./interface/ILendingPool.sol";
+import {WadRayMath} from "./utils/WadRayMath.sol";
 
 import "./utils/Errors.sol";
 
 contract LendingPool is Ownable, ILendingPool {
     using SafeERC20 for IERC20;
+    using WadRayMath for uint256;
 
     uint256 internal _reservesCount;
+    uint256 internal constant SECONDS_PER_YEAR = 365 days;
+
     address public collateralManager;
 
     mapping(address => ReserveData) internal _reserves;
     mapping(uint256 => address) internal _reservesList;
-
-    struct ReserveData {
-        //the liquidity index. Expressed in ray
-        uint128 liquidityIndex;
-        //variable borrow index. Expressed in ray
-        uint128 variableBorrowIndex;
-        //the current supply rate. Expressed in ray
-        uint128 currentLiquidityRate;
-        //the current variable borrow rate. Expressed in ray
-        uint128 currentBorrowRate;
-        uint40 lastUpdateTimestamp;
-        //tokens addresses
-        address lTokenAddress;
-        address debtTokenAddress;
-        //address of the interest rate strategy
-        address interestRateStrategyAddress;
-        //the id of the reserve. Represents the position in the list of the active reserves
-        uint8 id;
-    }
 
     constructor(address _owner) Ownable(_owner) {}
 
@@ -44,7 +29,7 @@ contract LendingPool is Ownable, ILendingPool {
         uint256 amount,
         address onBehalfOf
     ) external override {
-        if (amount == 0) revert Zero_Amount();
+        if (amount == 0) revert ZERO_AMOUNT();
 
         ReserveData storage reserve = _reserves[asset];
         address lToken = reserve.lTokenAddress;
@@ -64,7 +49,7 @@ contract LendingPool is Ownable, ILendingPool {
         uint256 amount,
         address to
     ) external returns (uint256) {
-        if (amount == 0) revert Zero_Amount();
+        if (amount == 0) revert ZERO_AMOUNT();
 
         ReserveData storage reserve = _reserves[asset];
         address lToken = reserve.lTokenAddress;
@@ -226,5 +211,23 @@ contract LendingPool is Ownable, ILendingPool {
         }
 
         return _activeReserves;
+    }
+
+    function getReserveNormalizedIncome(
+        address asset
+    ) external view returns (uint256) {
+        ReserveData memory reserve = _reserves[asset];
+
+        //solium-disable-next-line
+        if (reserve.lastUpdateTimestamp == block.timestamp) {
+            //if the index was updated in the same block, no need to perform any calculation
+            return reserve.liquidityIndex;
+        }
+
+        uint256 cumulated = ((reserve.currentLiquidityRate *
+            (block.timestamp - reserve.lastUpdateTimestamp)) /
+            SECONDS_PER_YEAR) + WadRayMath.ray();
+
+        return cumulated.rayMul(reserve.liquidityIndex);
     }
 }
