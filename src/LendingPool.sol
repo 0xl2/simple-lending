@@ -16,6 +16,7 @@ contract LendingPool is Ownable, ILendingPool {
 
     uint256 internal _reservesCount;
     uint256 internal constant SECONDS_PER_YEAR = 365 days;
+    uint256 public constant HEALTH_FACTOR_LIQUIDATION_THRESHOLD = 1 ether;
 
     address public collateralManager;
 
@@ -31,6 +32,9 @@ contract LendingPool is Ownable, ILendingPool {
     ) external override {
         if (amount == 0) revert ZERO_AMOUNT();
 
+        // dont need to check deposit validation as our pools are all active
+
+        // get lToken
         ReserveData storage reserve = _reserves[asset];
         address lToken = reserve.lTokenAddress;
 
@@ -55,7 +59,6 @@ contract LendingPool is Ownable, ILendingPool {
         address lToken = reserve.lTokenAddress;
 
         uint256 userBalance = ILToken(lToken).balanceOf(msg.sender);
-
         uint256 amountToWithdraw = amount > userBalance ? userBalance : amount;
 
         // ValidationLogic.validateWithdraw(
@@ -71,12 +74,12 @@ contract LendingPool is Ownable, ILendingPool {
         // reserve.updateState();
         // reserve.updateInterestRates(asset, lToken, 0, amountToWithdraw);
 
-        ILToken(lToken).burn(
-            msg.sender,
-            to,
-            amountToWithdraw,
-            reserve.liquidityIndex
-        );
+        // ILToken(lToken).burn(
+        //     msg.sender,
+        //     to,
+        //     amountToWithdraw,
+        //     reserve.liquidityIndex
+        // );
 
         emit Withdraw(asset, msg.sender, to, amountToWithdraw);
 
@@ -86,22 +89,85 @@ contract LendingPool is Ownable, ILendingPool {
     function borrow(
         address asset,
         uint256 amount,
-        uint256 interestRateMode,
         address onBehalfOf
     ) external {
         ReserveData storage reserve = _reserves[asset];
 
-        // _executeBorrow(
-        //     ExecuteBorrowParams(
-        //         asset,
-        //         msg.sender,
-        //         onBehalfOf,
-        //         amount,
-        //         interestRateMode,
-        //         reserve.lTokenAddress,
-        //         true
-        //     )
+        _executeBorrow(
+            ExecuteBorrowParams(
+                asset,
+                msg.sender,
+                onBehalfOf,
+                amount,
+                reserve.lTokenAddress
+            )
+        );
+    }
+
+    function _executeBorrow(ExecuteBorrowParams memory vars) internal {
+        ReserveData storage reserve = _reserves[vars.asset];
+        // UserConfigurationMap storage userConfig = _usersConfig[
+        //     vars.onBehalfOf
+        // ];
+
+        uint256 amountInETH = IPriceOracleGetter(reserve.priceOracle)
+            .getAssetPrice(vars.asset)
+            .mul(vars.amount)
+            .div(10 ** reserve.configuration.getDecimals());
+
+        // ValidationLogic.validateBorrow(
+        //     vars.asset,
+        //     reserve,
+        //     vars.onBehalfOf,
+        //     vars.amount,
+        //     amountInETH,
+        //     vars.interestRateMode,
+        //     _maxStableRateBorrowSizePercent,
+        //     _reserves,
+        //     userConfig,
+        //     _reservesList,
+        //     _reservesCount,
+        //     reserve.priceOracle
         // );
+
+        // reserve.updateState();
+
+        uint256 currentStableRate = 0;
+
+        IVariableDebtToken(reserve.variableDebtTokenAddress).mint(
+            vars.user,
+            vars.onBehalfOf,
+            vars.amount,
+            reserve.variableBorrowIndex
+        );
+
+        if (isFirstBorrowing) {
+            userConfig.setBorrowing(reserve.id, true);
+        }
+
+        reserve.updateInterestRates(
+            vars.asset,
+            vars.lTokenAddress,
+            0,
+            vars.releaseUnderlying ? vars.amount : 0
+        );
+
+        if (vars.releaseUnderlying) {
+            ILToken(vars.lTokenAddress).transferUnderlyingTo(
+                vars.user,
+                vars.amount
+            );
+        }
+
+        emit Borrow(
+            vars.asset,
+            vars.user,
+            vars.onBehalfOf,
+            vars.amount,
+            vars.interestRateMode,
+            reserve.variableBorrowIndex,
+            vars.referralCode
+        );
     }
 
     function repay(

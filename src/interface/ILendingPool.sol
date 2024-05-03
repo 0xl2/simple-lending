@@ -17,8 +17,17 @@ interface ILendingPool {
         address debtTokenAddress;
         //address of the interest rate strategy
         address interestRateStrategyAddress;
+        address priceOracle;
         //the id of the reserve. Represents the position in the list of the active reserves
         uint8 id;
+    }
+
+    struct ExecuteBorrowParams {
+        address asset;
+        address user;
+        address onBehalfOf;
+        uint256 amount;
+        address lTokenAddress;
     }
 
     /**
